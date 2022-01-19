@@ -85,13 +85,21 @@ def make_observation(client,encounter,obs_name,value):
     obs.save()
     return obs
 
+def make_random_observation(obs_name):
+    if model_generator[obs_name][1] != -1:
+        value = round(model_generator[obs_name][0](),model_generator[obs_name][1])
+        if model_generator[obs_name][1] == 0:
+            value = int(value)
+    else:
+        value = model_generator[obs_name][0]()
+    return value
+
 ##
 
 def make_full_patient_record(client):
-    first_names = ["Amy","Bill","Charlie","Danielle","Eric","Faith","Gerald","Hattie","Iris","Jane","Katie","Leo","Mark","Nathan","Otto",
-            "Priscilla","Quinn","Rose","Scott","Tina","Ulysses","Victoria","William","Youssef","Zoey"]
-    last_names = ["Allen","Baker","Carter","Diaz","Edwards","Forsyth","Garcia","Hall","Ichikawa","Jagger","Kane","Logan","Machado","Nguyen","O'hara",
-            "Packard","Quaid","Romanoff","Smith","Tucker","Uhlman","Vincente","Wall","Young","Zhou"]
+    first_names = ["Ana", "Bill", "Claudette", "Danny", "Elsa", "Fred", "Grace", "Henri", "Ida", "Julian", "Kate", "Larry", "Mindy", "Nicholas", "Odette", "Peter", "Rose", "Sam", "Teresa", "Victor", "Wanda"]
+    last_names = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega"]
+
     first = random.choice(first_names)
     last = random.choice(last_names)
     gender = random.choice(['male','female'])
@@ -99,19 +107,15 @@ def make_full_patient_record(client):
     encounter = make_encounter(client,patient)
     for key in model_vitals:
         for i in range(5):
-            value = model_generator[key]()
-            obs = make_observation(client,encounter,key,value)
+            obs = make_observation(client,encounter,key,make_random_observation(key))
     for key in model_exam:
         for i in range(5):
-            value = model_generator[key]()
-            obs = make_observation(client,encounter,key,value)
+            obs = make_observation(client,encounter,key,make_random_observation(key))
     for key in model_labs:
         for i in range(2):
-            value = model_generator[key]()
-            obs = make_observation(client,encounter,key,value)
+            obs = make_observation(client,encounter,key,make_random_observation(key))
     for key in model_other:
-        value = model_generator[key]()
-        obs = make_observation(client,encounter,key,value)
+        obs = make_observation(client,encounter,key,make_random_observation(key))
     return patient,encounter
 
 def build_patient_from_encounter(encounter):
@@ -142,9 +146,13 @@ def choose_encounter(client):
         choice = int(input("Choice? "))
     return patients[choice]['encounter']
 
-def get_values_for_encounter(encounter,variable):
+def get_resources_for_encounter(encounter,variable):
     loinc_code = name_to_loinc(variable)
     obs = client.resources("Observation").search(encounter=encounter.to_reference()['reference'],code__contains=loinc_code).fetch()
+    return obs
+
+def get_values_for_encounter(encounter,variable):
+    obs = get_resources_for_encounter(encounter,variable)
     vals = []
     for resource in obs:
         if 'valueQuantity' in resource.keys():
@@ -153,7 +161,14 @@ def get_values_for_encounter(encounter,variable):
             vals.append(resource['valueString'])
     return vals
 
-
+def get_all_resources_for_encounter(encounter,variable_list=None):
+    if variable_list is None:
+        variable_list = model_data_points
+    big_list = {}
+    for variable in variable_list:
+        res = get_resources_for_encounter(encounter,variable)
+        big_list[variable] = res
+    return big_list
 
 def get_all_values_for_encounter(encounter,variable_list=None):
     if variable_list is None:
@@ -166,13 +181,14 @@ def get_all_values_for_encounter(encounter,variable_list=None):
     return big_list
 
 def get_low_high(data,var):
-    print(var,data)
+    #print(var,data)
     if var in model_choices:
         # categorical
         if type(data) == str:
             return data,""
         data_num = [model_choices[var].index(i) for i in data]
         data_num.sort()
+        ## for categorical variables, only return the worst
         return model_choices[var][data_num[0]],""
     else:
         data.sort()
@@ -189,10 +205,11 @@ def generate_patient_row(patient_data):
         elif column in dataframe_continuous_columns:
             # continuous measure
             decoder = dataframe_continuous_columns[column]
-            if decoder[0] not in patient_data:
+            if decoder[0] not in patient_data or len(patient_data[decoder[0]]) == 0:
                 row.append(np.nan)
             else:
                 patient_data[decoder[0]].sort(reverse = decoder[1])
+                #print(column,decoder)
                 row.append(patient_data[decoder[0]][0])
         elif column in dataframe_categorical_columns:
             # categorical measure
@@ -268,7 +285,7 @@ def get_plot(processed_row):
     shap.plots.waterfall(morbmort_expl,show=False)
     ax1.set_title("Morbidity/Mortality prediction")
     fig.set_tight_layout({'w_pad':2})
-    return [fig,[mortprediction,morbmortprediction]]
+    return [fig,[mortprediction[0],morbmortprediction[0]]]
 
 def run_prediction(processed_row):
     fig,preds = get_plot(processed_row)
