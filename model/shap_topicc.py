@@ -1,4 +1,4 @@
-# This is meant to be run in Jupyter in combination with basic.py or full.py
+# This is meant to be run in Jupyter or IPython in combination with whole.py
 # It assumes an X and y and various models
 
 import shap

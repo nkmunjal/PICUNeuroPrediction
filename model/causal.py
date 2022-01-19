@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+##
+# Initial graphical causal discovery using causallearn package
+# @author Neil Munjal
+
 from causallearn.search.ConstraintBased.PC import pc
 from causallearn.search.ConstraintBased.FCI import fci
 from causallearn.search.FCMBased import lingam
@@ -9,6 +13,9 @@ import pandas as pd
 import numpy as np
 
 file = '/home/repositories/git/nkmj/topicc-local/data/causal/neuro_cont_mort_nona.csv'
+# requires simple flat file of all continuous physiologic variables without any
+# missing values, created separately and exported to the above file. Below is
+# the same file with missing values kept in.
 df = pd.read_csv(file)
 cg = pc(df.to_numpy(),0.025, fisherz,True,0,-1,False)
 #cg.draw_pydot_graph()
